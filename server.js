@@ -7,6 +7,10 @@ const app = express();
 const server = http.createServer(app);
 const port = process.env.PORT || 3000;
 
+app.get('/', (req, res) => {
+    res.sendFile(__dirname + '/pages/chat.html');
+});
+
 app.use((req, res) => {
     res.sendFile(__dirname + '/pages/404.html');
 });
