@@ -7,6 +7,10 @@ const app = express();
 const server = http.createServer(app);
 const port = process.env.PORT || 3000;
 
+app.use((req, res) => {
+    res.sendFile(__dirname + '/404.html');
+});
+
 server.listen(port, () => {
     console.log(chalk.rgb(255, 255, 0)('Server running...'));
 });
