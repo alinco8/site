@@ -8,7 +8,7 @@ const server = http.createServer(app);
 const port = process.env.PORT || 3000;
 
 app.use((req, res) => {
-    res.sendFile(__dirname + '/404.html');
+    res.sendFile(__dirname + '/pages/404.html');
 });
 
 server.listen(port, () => {
