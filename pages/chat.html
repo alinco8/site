@@ -5,8 +5,198 @@
         <meta http-equiv="X-UA-Compatible" content="IE=edge" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Chat</title>
+        <style>
+            * {
+                margin: 0px;
+            }
+
+            #videos {
+                display: flex;
+                width: 100%;
+                justify-content: space-around;
+            }
+
+            #videos video {
+                width: 49.5vw;
+                height: auto;
+                box-sizing: border-box;
+                border: 1px solid #000;
+            }
+
+            #control label > * {
+                margin: 6px;
+            }
+        </style>
+        <script src="/socket.io/socket.io.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/vue@next"></script>
+        <script>
+            let socket = io.connect('/'),
+                _rtcPeerConnection;
+
+            socket.on('signaling', (objData) => {
+                if ('offer' === objData.type) {
+                    if (_rtcPeerConnection) {
+                        return;
+                    }
+
+                    let rtcPeerConnection = createPeerConnection(document.getElementById('local').srcObject);
+                    _rtcPeerConnection = rtcPeerConnection;
+
+                    console.log('Call : setOfferSDP_and_createAnswerSDP()');
+                    setOfferSDP_and_createAnswerSDP(rtcPeerConnection, objData.data);
+                } else if ('answer' === objData.type) {
+                    if (!_rtcPeerConnection) {
+                        return;
+                    }
+                    setAnswerSDP(_rtcPeerConnection, objData.data);
+                }
+            });
+            window.addEventListener('load', () => {
+                const app = Vue.createApp({
+                    data() {
+                        return {
+                            enabled: {
+                                video: false,
+                                audio: true,
+                            },
+                        };
+                    },
+                    async mounted() {
+                        try {
+                            var stream = await navigator.mediaDevices.getUserMedia(this.enabled);
+                        } catch (err) {
+                            switch (err.toString()) {
+                                case 'NotAllowedError: Permission denied':
+                                    alert('カメラとマイクへのアクセスを許可してください');
+                                    break;
+
+                                default:
+                                    break;
+                            }
+                        }
+                        document.getElementById('local').srcObject = stream;
+                    },
+                    watch: {
+                        async 'enabled.video'(value) {
+                            let stream = document.getElementById('local').srcObject;
+                            if (!value) {
+                                stream.getVideoTracks()[0].stop();
+                            } else {
+                                document.getElementById('local').srcObject = await navigator.mediaDevices.getUserMedia(this.enabled);
+                            }
+                        },
+                        async 'enabled.audio'(value) {
+                            let stream = document.getElementById('local').srcObject;
+                            if (!value) {
+                                stream.getAudioTracks()[0].stop();
+                            } else {
+                                document.getElementById('local').srcObject = await navigator.mediaDevices.getUserMedia(this.enabled);
+                            }
+                        },
+                    },
+                    methods: {
+                        start() {
+                            document.querySelector('button').disabled = true;
+
+                            let rtcPeerConnection = createPeerConnection(document.getElementById('local').srcObject);
+                            _rtcPeerConnection = rtcPeerConnection;
+
+                            createOfferSDP(rtcPeerConnection);
+                        },
+                    },
+                });
+                window./*const */ vm = app.mount('body');
+            });
+            function getCookie(name) {
+                let cookies = Object.fromEntries(
+                    document.cookie
+                        .replace(/( )/g, '')
+                        .split(';')
+                        .map((a) => a.split('='))
+                );
+                return name ? cookies[name] : cookies;
+            }
+            /**
+             * @param {MediaStream} stream
+             */
+            function createPeerConnection(stream) {
+                let rtcPeerConnection = new RTCPeerConnection({ iceServers: [] });
+
+                setupPeerConnectionEvents(rtcPeerConnection);
+
+                stream.getTracks().map((track) => {
+                    rtcPeerConnection.addTrack(track, stream);
+                });
+
+                return rtcPeerConnection;
+            }
+            /**
+             * @param {RTCPeerConnection} rtcPeerConnection
+             */
+            function setupPeerConnectionEvents(rtcPeerConnection) {
+                rtcPeerConnection.onicegatheringstatechange = () => {
+                    if (rtcPeerConnection.iceGatheringState === 'complete') {
+                        if (rtcPeerConnection.localDescription.type === 'offer') {
+                            socket.emit('signaling', { type: 'offer', data: rtcPeerConnection.localDescription });
+                        } else if (rtcPeerConnection.localDescription.type === 'answer') {
+                            socket.emit('signaling', { type: 'answer', data: rtcPeerConnection.localDescription });
+                        }
+                    }
+                };
+                rtcPeerConnection.ontrack = (e) => {
+                    let stream = e.streams[0];
+                    let track = e.track;
+                    if (track.kind === 'video') {
+                        document.getElementById('remote').srcObject = stream;
+                    }
+                };
+            }
+            /**
+             * @param {RTCPeerConnection} rtcPeerConnection
+             */
+            function createOfferSDP(rtcPeerConnection) {
+                rtcPeerConnection
+                    .createOffer()
+                    .then((sessionDescription) => {
+                        return rtcPeerConnection.setLocalDescription(sessionDescription);
+                    })
+                    .then(() => {});
+            }
+            /**
+             * @param {RTCPeerConnection} rtcPeerConnection
+             */
+            function setOfferSDP_and_createAnswerSDP(rtcPeerConnection, sessionDescription) {
+                rtcPeerConnection
+                    .setRemoteDescription(sessionDescription)
+                    .then(() => {
+                        return rtcPeerConnection.createAnswer();
+                    })
+                    .then((sessionDescription) => {
+                        return rtcPeerConnection.setLocalDescription(sessionDescription);
+                    })
+                    .then(() => {});
+            }
+            function setAnswerSDP(rtcPeerConnection, sessionDescription) {
+                rtcPeerConnection.setRemoteDescription(sessionDescription);
+            }
+        </script>
     </head>
+
     <body>
-        Chat
+        <div id="videos">
+            <video id="local" width="320" height="240" autoplay muted></video>
+            <video id="remote" width="320" height="240" autoplay></video>
+        </div>
+        <section id="control">
+            <label>
+                <span>Video</span>
+                <input type="checkbox" id="video" v-model="enabled.video" />
+            </label>
+            <label>
+                <span>Audio</span>
+                <input type="checkbox" id="audio" v-model="enabled.audio" />
+            </label>
+            <button @click="start">Start</button>
+        </section>
     </body>
 </html>

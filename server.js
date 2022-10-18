@@ -1,10 +1,18 @@
 const express = require('express');
 const socketIO = require('socket.io');
 const chalk = require('chalk');
-const http = require('http');
+const https = require('https');
+const fs = require('fs');
 
 const app = express();
-const server = http.createServer(app);
+const server = https.createServer(
+    {
+        key: fs.readFileSync('/Users/Ali/vscode_live_server.key.pem'),
+        cert: fs.readFileSync('/Users/Ali/vscode_live_server.cert.pem'),
+    },
+    app
+);
+const io = socketIO(server);
 const port = process.env.PORT || 3000;
 
 app.get('/', (req, res) => {
@@ -13,6 +21,12 @@ app.get('/', (req, res) => {
 
 app.use((req, res) => {
     res.sendFile(__dirname + '/pages/404.html');
+});
+
+io.on('connection', (socket) => {
+    socket.on('signaling', (objData) => {
+        socket.broadcast.emit('signaling', objData);
+    });
 });
 
 server.listen(port, () => {
