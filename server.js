@@ -14,6 +14,7 @@ const server = https.createServer(
 );
 const io = socketIO(server);
 const port = process.env.PORT || 3000;
+app.use(express.static(__dirname + '/public'));
 
 app.get('/', (req, res) => {
     res.sendFile(__dirname + '/pages/chat.html');
