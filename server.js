@@ -1,16 +1,10 @@
 const express = require('express');
 const webPush = require('web-push');
-const https = require('https');
+const http = require('http');
 const fs = require('fs');
 
 const app = express();
-const server = https.createServer(
-    {
-        cert: fs.readFileSync(__dirname + '/etc/https/server.crt'),
-        key: fs.readFileSync(__dirname + '/etc/https/server.key'),
-    },
-    app
-);
+const server = http.createServer(app);
 const vapidKeys = webPush.generateVAPIDKeys();
 
 app.use(express.json());
