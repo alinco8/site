@@ -53,4 +53,6 @@ app.post('/push_all', (req, res) => {
     );
 });
 
-server.listen(3000, () => {});
+server.listen(process.env.PORT, () => {
+    console.log('Running server...');
+});
